@@ -10,6 +10,7 @@ Un clon de Minecraft que se juega en el navegador, hecho con JavaScript y [Three
 - Carga y descarga de chunks alrededor del jugador, con distancia de renderizado ajustable.
 - Mallado con sólo las caras visibles, sombreado por cara y oclusión ambiental por vértice.
 - Texturas pixeladas generadas por código (no hace falta ningún archivo de imagen).
+- Se juega con ratón y teclado o con la pantalla táctil del móvil.
 - Física del jugador: gravedad, salto, colisiones, nadar en el agua, correr y modo vuelo.
 - Romper, colocar y copiar bloques; barra rápida de 9 ranuras e inventario con 15 bloques.
 - Ciclo de día y noche con sol, luna, estrellas y nubes.
@@ -47,6 +48,12 @@ También se puede publicar tal cual en GitHub Pages.
 | E | Inventario |
 | F3 | Información de depuración |
 | Esc | Pausa |
+
+Si el navegador no deja bloquear el ratón, el juego sigue funcionando: arrastra el ratón para mirar,
+haz clic para romper y clic derecho para colocar.
+
+En el móvil aparecen controles táctiles: arrastra en la mitad izquierda para moverte y en la derecha para
+mirar; los botones sirven para saltar, bajar, volar, romper, poner y abrir los bloques.
 
 ## Estructura
 

@@ -27,13 +27,11 @@ export class Player {
   update(dt, input) {
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
-    let fx = 0, fz = 0;
-    if (input.forward) { fx -= sin; fz -= cos; }
-    if (input.back) { fx += sin; fz += cos; }
-    if (input.right) { fx += cos; fz -= sin; }
-    if (input.left) { fx -= cos; fz += sin; }
+    // moveZ: adelante (+) / atrás (-); moveX: derecha (+) / izquierda (-).
+    let fx = -sin * input.moveZ + cos * input.moveX;
+    let fz = -cos * input.moveZ - sin * input.moveX;
     const len = Math.hypot(fx, fz);
-    if (len > 0) { fx /= len; fz /= len; }
+    if (len > 1) { fx /= len; fz /= len; }
 
     const p = this.pos;
     this.inWater = KIND[this.blockAt(p.x, p.y + 0.4, p.z)] === KIND_LIQUID;

@@ -78,6 +78,39 @@
     background: #8b8b8b; box-shadow: inset -2px -2px #555, inset 2px 2px #c6c6c6;
   }
   .hint { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+  #hint {
+    position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6); padding: 8px 12px; font-size: 14px; text-align: center;
+    width: max-content; max-width: calc(100% - 32px); pointer-events: none;
+  }
+  #game { touch-action: none; }
+  #touch { display: none; }
+  body.touch #touch { display: block; }
+  body.touch #hotbar { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)); }
+  body.touch #blockname { bottom: auto; top: calc(64px + env(safe-area-inset-top, 0px)); }
+  body.touch .desktop-only { display: none; }
+  body:not(.touch) .touch-only { display: none; }
+  #stick {
+    position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.2);
+    pointer-events: none; display: none; left: 90px; top: 70%;
+  }
+  #stick.active { display: block; }
+  #knob {
+    position: absolute; left: 30px; top: 30px; width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+  }
+  #tbuttons {
+    position: fixed; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    display: grid; grid-template-columns: repeat(3, 58px); gap: 8px;
+  }
+  #tbuttons button, #t-pause {
+    width: 58px; height: 58px; padding: 0; font-size: 12px; opacity: 0.8; touch-action: none;
+  }
+  #t-pause {
+    position: fixed; width: 44px; height: 44px; font-size: 16px;
+    right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(8px + env(safe-area-inset-top, 0px));
+  }
   @media (max-width: 560px) {
     .slot { width: 36px; height: 36px; }
     .slot canvas { width: 28px !important; height: 28px !important; }
@@ -95,6 +128,20 @@
   <div id="blockname"></div>
   <div id="hotbar"></div>
   <div id="debug"></div>
+  <div id="hint" class="hidden"></div>
+
+  <div id="touch">
+    <div id="stick"><div id="knob"></div></div>
+    <div id="tbuttons">
+      <button id="t-fly">Volar</button>
+      <button id="t-jump">Saltar</button>
+      <button id="t-down">Bajar</button>
+      <button id="t-inv">Bloques</button>
+      <button id="t-break">Romper</button>
+      <button id="t-place">Poner</button>
+    </div>
+    <button id="t-pause" aria-label="Pausa">II</button>
+  </div>
 
   <div id="menu" class="overlay">
     <div class="panel">
@@ -107,7 +154,7 @@
         <input type="range" id="rd" min="2" max="12" step="1">
       </label>
       <button id="newworld">Nuevo mundo</button>
-      <div class="controls">
+      <div class="controls desktop-only">
         <b>WASD</b><span>Moverse</span>
         <b>Espacio</b><span>Saltar / nadar / subir</span>
         <b>Shift</b><span>Correr / bajar al volar</span>
@@ -120,6 +167,12 @@
         <b>F3</b><span>Información de depuración</span>
         <b>Esc</b><span>Pausa</span>
       </div>
+      <div class="controls touch-only">
+        <b>Mitad izq.</b><span>Arrastra para moverte</span>
+        <b>Mitad der.</b><span>Arrastra para mirar</span>
+        <b>Botones</b><span>Saltar, bajar, volar, romper, poner</span>
+        <b>Barra</b><span>Toca un bloque para elegirlo</span>
+      </div>
       <p class="seed">Semilla: <span id="seed"></span> · el mundo se guarda solo</p>
     </div>
   </div>
@@ -129,6 +182,7 @@
       <h2>Bloques</h2>
       <div id="invgrid"></div>
       <p class="hint">Haz clic en un bloque para ponerlo en la ranura seleccionada. Pulsa E para volver.</p>
+      <button id="invclose">Volver al juego</button>
     </div>
   </div>
 

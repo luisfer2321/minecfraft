@@ -360,41 +360,100 @@ for (const id of PLACEABLE) {
   invGrid.appendChild(cell);
 }
 
+// El juego funciona de tres formas: con el ratón bloqueado (lo normal en un
+// ordenador), arrastrando el ratón para mirar si el navegador no permite
+// bloquearlo, o con controles táctiles en el móvil.
+let playing = false;
 let locked = false;
+let lockUnavailable = false;
 let inventoryOpen = false;
+const touchMode = window.matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints > 0;
 const keys = new Set();
 const mouse = { left: false, right: false, timer: 0 };
+const drag = { active: false, button: 0, x: 0, y: 0, moved: 0, time: 0 };
+const stick = { id: null, x: 0, y: 0, dx: 0, dy: 0 };
+const look = { id: null, x: 0, y: 0 };
+const touchKeys = { jump: false, down: false };
+if (touchMode) document.body.classList.add('touch');
 
-function lockPointer() {
-  try {
-    const p = canvas.requestPointerLock();
-    if (p && p.catch) p.catch(() => showMenu());
-  } catch {
-    showMenu();
-  }
+function rotateView(dx, dy, sens) {
+  player.yaw -= dx * sens;
+  player.pitch -= dy * sens;
+  player.pitch = Math.max(-Math.PI / 2 + 0.001, Math.min(Math.PI / 2 - 0.001, player.pitch));
 }
 
-function showMenu() {
+let hintTimer = 0;
+function showHint(text) {
+  const el = $('hint');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => el.classList.add('hidden'), 6000);
+}
+
+function onLockFailed() {
+  if (lockUnavailable || !playing) return;
+  lockUnavailable = true;
+  showHint('Arrastra el ratón para mirar · clic: romper · clic derecho: colocar · Esc: pausa');
+}
+document.addEventListener('pointerlockerror', onLockFailed);
+
+function lockPointer() {
+  if (touchMode || lockUnavailable) return;
+  try {
+    const p = canvas.requestPointerLock();
+    if (p && p.catch) p.catch(onLockFailed);
+  } catch {
+    onLockFailed();
+    return;
+  }
+  // Algunos navegadores ignoran la petición sin avisar.
+  setTimeout(() => {
+    if (playing && !locked && !inventoryOpen) onLockFailed();
+  }, 700);
+}
+
+function releaseInput() {
+  keys.clear();
+  mouse.left = mouse.right = false;
+  drag.active = false;
+  stick.id = look.id = null;
+  stick.dx = stick.dy = 0;
+  touchKeys.jump = touchKeys.down = false;
+  $('knob').style.transform = '';
+}
+
+function startPlaying() {
+  $('menu').classList.add('hidden');
+  playing = true;
+  lockUnavailable = false;
+  lockPointer();
+}
+
+function pause() {
+  playing = false;
+  releaseInput();
   $('menu').classList.remove('hidden');
+  if (locked) document.exitPointerLock();
+  writeSave();
 }
 
 function openInventory() {
   inventoryOpen = true;
+  releaseInput();
   $('inventory').classList.remove('hidden');
-  document.exitPointerLock();
+  if (locked) document.exitPointerLock();
 }
 
 function closeInventory(resume) {
   inventoryOpen = false;
   $('inventory').classList.add('hidden');
   if (resume) lockPointer();
-  else showMenu();
+  else pause();
 }
 
-$('play').addEventListener('click', () => {
-  $('menu').classList.add('hidden');
-  lockPointer();
-});
+$('play').addEventListener('click', startPlaying);
+$('invclose').addEventListener('click', () => closeInventory(true));
 let newWorldArmed = 0;
 $('newworld').addEventListener('click', () => {
   const btn = $('newworld');
@@ -425,43 +484,125 @@ rdInput.addEventListener('input', () => {
 });
 $('seed').textContent = seed;
 
-canvas.addEventListener('click', () => {
-  if (!locked && !inventoryOpen && $('menu').classList.contains('hidden')) lockPointer();
-});
-
 document.addEventListener('pointerlockchange', () => {
+  const wasLocked = locked;
   locked = document.pointerLockElement === canvas;
-  if (!locked) {
-    keys.clear();
-    mouse.left = mouse.right = false;
-    if (!inventoryOpen) showMenu();
-    writeSave();
+  if (wasLocked && !locked && playing && !inventoryOpen) pause();
+});
+
+// ----- Ratón -----
+canvas.addEventListener('mousedown', (e) => {
+  if (!playing || inventoryOpen || touchMode) return;
+  if (locked) {
+    if (e.button === 0) { mouse.left = true; mouse.timer = 0.25; breakBlock(); }
+    else if (e.button === 2) { mouse.right = true; mouse.timer = 0.25; placeBlock(); }
+    else if (e.button === 1) { e.preventDefault(); pickBlock(); }
+    return;
   }
+  if (!lockUnavailable) {
+    lockPointer();
+    return;
+  }
+  Object.assign(drag, { active: true, button: e.button, x: e.clientX, y: e.clientY, moved: 0, time: performance.now() });
+  if (e.button === 1) { e.preventDefault(); pickBlock(); }
 });
-
 document.addEventListener('mousemove', (e) => {
-  if (!locked) return;
-  const sens = 0.0022;
-  player.yaw -= e.movementX * sens;
-  player.pitch -= e.movementY * sens;
-  player.pitch = Math.max(-Math.PI / 2 + 0.001, Math.min(Math.PI / 2 - 0.001, player.pitch));
-});
-
-document.addEventListener('mousedown', (e) => {
-  if (!locked) return;
-  if (e.button === 0) { mouse.left = true; mouse.timer = 0.25; breakBlock(); }
-  else if (e.button === 2) { mouse.right = true; mouse.timer = 0.25; placeBlock(); }
-  else if (e.button === 1) { e.preventDefault(); pickBlock(); }
+  if (locked) {
+    rotateView(e.movementX, e.movementY, 0.0022);
+  } else if (drag.active) {
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    drag.moved += Math.abs(dx) + Math.abs(dy);
+    rotateView(dx, dy, 0.005);
+  }
 });
 document.addEventListener('mouseup', (e) => {
   if (e.button === 0) mouse.left = false;
   if (e.button === 2) mouse.right = false;
+  if (drag.active && e.button === drag.button) {
+    drag.active = false;
+    // Un clic corto sin arrastrar rompe o coloca.
+    if (drag.moved < 6 && performance.now() - drag.time < 350) {
+      if (e.button === 0) breakBlock();
+      else if (e.button === 2) placeBlock();
+    }
+  }
 });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('wheel', (e) => {
-  if (locked) selectSlot(selected + Math.sign(e.deltaY));
+  if (playing && !inventoryOpen) selectSlot(selected + Math.sign(e.deltaY));
 }, { passive: true });
 
+// ----- Pantalla táctil -----
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (!playing || inventoryOpen) return;
+  for (const t of e.changedTouches) {
+    if (t.clientX < window.innerWidth / 2 && stick.id === null) {
+      Object.assign(stick, { id: t.identifier, x: t.clientX, y: t.clientY, dx: 0, dy: 0 });
+      const base = $('stick');
+      base.style.left = `${t.clientX}px`;
+      base.style.top = `${t.clientY}px`;
+      base.classList.add('active');
+    } else if (look.id === null) {
+      Object.assign(look, { id: t.identifier, x: t.clientX, y: t.clientY });
+    }
+  }
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === stick.id) {
+      const max = 50;
+      let dx = t.clientX - stick.x;
+      let dy = t.clientY - stick.y;
+      const len = Math.hypot(dx, dy);
+      if (len > max) { dx *= max / len; dy *= max / len; }
+      stick.dx = dx / max;
+      stick.dy = dy / max;
+      $('knob').style.transform = `translate(${dx}px, ${dy}px)`;
+    } else if (t.identifier === look.id) {
+      rotateView(t.clientX - look.x, t.clientY - look.y, 0.006);
+      look.x = t.clientX;
+      look.y = t.clientY;
+    }
+  }
+}, { passive: false });
+function endTouch(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === stick.id) {
+      stick.id = null;
+      stick.dx = stick.dy = 0;
+      $('knob').style.transform = '';
+      $('stick').classList.remove('active');
+    } else if (t.identifier === look.id) {
+      look.id = null;
+    }
+  }
+}
+canvas.addEventListener('touchend', endTouch);
+canvas.addEventListener('touchcancel', endTouch);
+
+function holdButton(id, onDown, onUp) {
+  const el = $(id);
+  el.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (playing && !inventoryOpen) onDown();
+  }, { passive: false });
+  el.addEventListener('touchend', (e) => { e.preventDefault(); onUp?.(); });
+  el.addEventListener('touchcancel', () => onUp?.());
+}
+holdButton('t-break', () => { mouse.left = true; mouse.timer = 0.3; breakBlock(); }, () => { mouse.left = false; });
+holdButton('t-place', () => { mouse.right = true; mouse.timer = 0.3; placeBlock(); }, () => { mouse.right = false; });
+holdButton('t-jump', () => { touchKeys.jump = true; }, () => { touchKeys.jump = false; });
+holdButton('t-down', () => { touchKeys.down = true; }, () => { touchKeys.down = false; });
+holdButton('t-fly', () => { player.flying = !player.flying; player.vel.set(0, 0, 0); });
+holdButton('t-inv', openInventory);
+holdButton('t-pause', pause);
+
+// ----- Teclado -----
 let showDebug = false;
 document.addEventListener('keydown', (e) => {
   if (e.code === 'F3') {
@@ -475,7 +616,10 @@ document.addEventListener('keydown', (e) => {
     else if (e.code === 'Escape') closeInventory(false);
     return;
   }
-  if (!locked) return;
+  if (!playing) {
+    if (e.code === 'Enter') startPlaying();
+    return;
+  }
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   keys.add(e.code);
   if (e.code.startsWith('Digit')) {
@@ -486,9 +630,12 @@ document.addEventListener('keydown', (e) => {
     player.vel.set(0, 0, 0);
   } else if (e.code === 'KeyE') {
     openInventory();
+  } else if (e.code === 'Escape' && !locked) {
+    pause();
   }
 });
 document.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', releaseInput);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -501,7 +648,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) writeSave();
 });
 setInterval(() => {
-  if (locked) writeSave();
+  if (playing) writeSave();
 }, 10000);
 
 // ---------- Día y noche ----------
@@ -550,20 +697,19 @@ function updateSky(underwater) {
 }
 
 // ---------- Bucle principal ----------
-const input = { forward: false, back: false, left: false, right: false, jump: false, down: false, sprint: false };
+const input = { moveX: 0, moveZ: 0, jump: false, down: false, sprint: false };
 const lookDir = new THREE.Vector3();
 let last = performance.now();
 let fps = 0, fpsFrames = 0, fpsTime = 0;
 let loadingDone = false;
 
 function readInput() {
-  input.forward = keys.has('KeyW') || keys.has('ArrowUp');
-  input.back = keys.has('KeyS') || keys.has('ArrowDown');
-  input.left = keys.has('KeyA') || keys.has('ArrowLeft');
-  input.right = keys.has('KeyD') || keys.has('ArrowRight');
-  input.jump = keys.has('Space');
+  const k = (...codes) => (codes.some((c) => keys.has(c)) ? 1 : 0);
+  input.moveZ = k('KeyW', 'ArrowUp') - k('KeyS', 'ArrowDown') - stick.dy;
+  input.moveX = k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft') + stick.dx;
+  input.jump = keys.has('Space') || touchKeys.jump;
   const shift = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  input.down = shift;
+  input.down = shift || touchKeys.down;
   // Shift corre al caminar y baja al volar; Ctrl corre siempre.
   input.sprint = keys.has('ControlLeft') || (shift && !player.flying);
 }
@@ -595,7 +741,7 @@ function frame(now) {
     $('loading').textContent = 'Mundo listo';
   }
 
-  if (locked && ready) {
+  if (playing && !inventoryOpen && ready) {
     time = (time + dt / DAY_LENGTH) % 1;
     readInput();
     player.update(dt, input);
