@@ -26,7 +26,7 @@
   #crosshair::before { left: 9px; top: 0; width: 2px; height: 20px; }
   #crosshair::after { top: 9px; left: 0; width: 20px; height: 2px; }
   #hotbar {
-    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px;
+    position: fixed; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); display: flex; gap: 2px;
     padding: 3px; background: rgba(0, 0, 0, 0.45); border: 2px solid #1b1b1b;
   }
   .slot {

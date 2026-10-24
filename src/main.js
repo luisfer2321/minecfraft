@@ -395,8 +395,18 @@ $('play').addEventListener('click', () => {
   $('menu').classList.add('hidden');
   lockPointer();
 });
+let newWorldArmed = 0;
 $('newworld').addEventListener('click', () => {
-  if (!confirm('¿Crear un mundo nuevo? Se perderá el mundo actual.')) return;
+  const btn = $('newworld');
+  // Pide un segundo clic para confirmar en lugar de un diálogo del navegador.
+  if (!newWorldArmed) {
+    btn.textContent = '¿Seguro? Pulsa otra vez para borrar este mundo';
+    newWorldArmed = setTimeout(() => {
+      newWorldArmed = 0;
+      btn.textContent = 'Nuevo mundo';
+    }, 4000);
+    return;
+  }
   try {
     localStorage.removeItem(SAVE_KEY);
   } catch {
